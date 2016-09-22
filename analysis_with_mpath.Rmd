@@ -1,0 +1,250 @@
+---
+title: "Analysis with Mpath"
+output: html_notebook
+---
+
+```{r}
+library(Mpath)
+```
+
+Quality check
+-------------
+
+```{r}
+# QC_gene removes genes that have TPM values < 1
+# in more than 95 percent of cells in each group
+
+rpkmFile   <- "mpath/only_genes_CD4tcells_tpm.txt"
+rpkmQCFile <- "mpath/only_genes_CD4tcells_tpm_geneQC.txt"
+sampleFile <- NULL
+QC_gene(rpkmFile   = rpkmFile,
+        rpkmQCFile = rpkmQCFile,
+        sampleFile = sampleFile, threshold = 0.05, method = "any")
+```
+
+
+```{r}
+rpkmQC <- fread(rpkmQCFile)
+dim(rpkmQC)
+```
+
+
+```{r}
+
+write.table(sampleInfo, file="mpath/CD4tcells_sample_day_info.txt", sep="\t", 
+            row.names=F, col.names=T, quote=F)
+```
+
+
+```{r}
+rpkmFile   <- "mpath/only_genes_CD4tcells_tpm_geneQC.txt"
+sampleFile <- "mpath/CD4tcells_sample_day_info.txt"
+find_optimal_cluster_number(rpkmFile = rpkmFile,
+                            sampleFile = sampleFile,
+                            min_cluster_num = 7, max_cluster_num = 15,
+                            diversity_cut = 0.6, size_cut = 0.05)
+### optimal number of cluster -> 11
+```
+
+### Landmark designation
+
+```{r}
+rpkmFile   <- "mpath/only_genes_CD4tcells_tpm_geneQC.txt"
+baseName   <- "mpath/only_genes_CD4tcells_tpm_geneQC";
+sampleFile <- "mpath/CD4tcells_sample_day_info.txt"
+landmark_cluster <- landmark_designation(rpkmFile = rpkmFile,
+                                         baseName = baseName,
+                                         sampleFile = sampleFile,
+                                         method = "diversity_size",
+                                         numcluster = 11, diversity_cut=0.6,
+                                         size_cut=0.05)
+```
+
+```{r}
+landmark_cluster2 <- landmark_cluster
+landmark_cluster2$cell <- gsub("^X", "",   landmark_cluster2$cell)
+landmark_cluster2$cell <- gsub("\\.", "-", landmark_cluster2$cell)
+
+write.table(landmark_cluster2, file="mpath/only_genes_CD4tcells_tpm_geneQC_landmark_cluster2.txt",
+            row.names=F, col.names = T, sep="\t")
+```
+
+
+### Plot hierachical clustering 
+
+```{r}
+SC_hc_colorCode(dataFile   = "mpath/only_genes_CD4tcells_tpm_geneQC.txt",
+                cuttree_k  = 11,
+                sampleFile = "mpath/CD4tcells_sample_day_info.txt",
+                width = 22, height = 10, iflog2 = TRUE,
+                colorPalette = NULL)
+```
+
+### Construct weighted neighborhood network
+
+```{r}
+
+exprs    <- "mpath/only_genes_CD4tcells_tpm_geneQC.txt"
+baseName <- "mpath/only_genes_CD4tcells_tpm_geneQC"
+neighbor_network <- build_network(exprs = exprs,
+                                  landmark_cluster = landmark_cluster2,
+                                  baseName = baseName)
+```
+
+### TrimNet: trim edges of lower weights
+
+```{r}
+baseName = "mpath/only_genes_CD4tcells_tpm_geneQC";
+trimmed_net <- trim_net(neighbor_network, textSize=30,
+                        baseName = baseName,
+                        method = "mst")
+```
+
+### plot trimmed net and color-code the nodes by gene expression
+
+```{r}
+rpkmFile <- "mpath/only_genes_CD4tcells_tpm_geneQC.txt"
+lmFile   <- "mpath/only_genes_CD4tcells_tpm_geneQC_landmark_cluster.txt"
+color_code_node_2(networkFile = trimmed_net,
+                  rpkmFile = rpkmFile,
+                  lmFile = lmFile,
+                  geneName=c("Irf8","Id2","Batf3"),
+                  baseName="cDC1_marker",
+                  seed=NULL)
+```
+
+### Re-order the cells on the path connecting landmark 
+### "day2_4", "day2_7",  "day4_2", "day4_9", "day4_5",
+### "day4_8", "day7_10", "day7_11"
+
+```{r}
+exprs  <- "mpath/only_genes_CD4tcells_tpm_geneQC.txt"
+ccFile <- "mpath/only_genes_CD4tcells_tpm_geneQC_landmark_cluster2.txt"
+order2 <- nbor_order(exprs = exprs,
+                    ccFile = ccFile, 
+                    lm_order = c("day_2_4", "day_2_7",  "day_4_2", "day_4_9", "day_4_5",
+                                 "day_4_8", "day_7_10", "day_7_11"),
+                    if_bb_only=FALSE,
+                    method=1)
+```
+
+### identify genes that changed along the cell re-ordering
+
+```{r}
+deg <- vgam_deg(exprs = "mpath/only_genes_CD4tcells_tpm_geneQC.txt",
+                order = order2,
+                lm_order = c("day_2_4", "day_2_7",  "day_4_2", "day_4_9", "day_4_5",
+                                 "day_4_8", "day_7_10", "day_7_11"),
+                min_expr=1,
+                p_threshold=0.05)
+```
+
+### plot heatmap of genes that changed along the cell re-ordering
+
+```{r}
+dev.off()
+heatmap_nbor(exprs = "mpath/only_genes_CD4tcells_tpm_geneQC.txt",                        
+             cell_order = "mpath/day_2_4_day_2_7_day_4_2_day_4_9_day_4_5_day_4_8_day_7_10_day_7_11_order.txt", 
+             plot_genes = "mpath/day_2_4_day_2_7_day_4_2_day_4_9_day_4_5_day_4_8_day_7_10_day_7_11_vgam_deg0.05.txt",
+             cell_annotation = "mpath/CD4tcells_sample_day_info.txt", 
+             num_gene_cluster = 6,
+             hm_height = 15, hm_width = 10,
+             baseName = "mpath/day_2_4_day_2_7_day_4_2_day_4_9_day_4_5_day_4_8_day_7_10_day_7_11")
+```
+
+```{r}
+mycolors <- c("#81CDC3", "#EB867F",  "#D0AB80", "#BDD68F", "#F9EF76")
+names(mycolors) <- c("day_0", "day_2", "day_3", "day_4", "day_7")
+```
+
+
+```{r}
+### path 1: "day_2_4", "day_2_7",  "day_4_2", "day_4_9", "day_4_5", "day_4_8"
+ccFile <- "mpath/only_genes_CD4tcells_tpm_geneQC_landmark_cluster2.txt"
+order1  <- nbor_order(exprs = "mpath/only_genes_CD4tcells_tpm_geneQC.txt",
+                     ccFile = ccFile, 
+                     lm_order = c("day_2_4", "day_2_7",  "day_4_2", "day_4_9", "day_4_5",
+                                 "day_4_8"),
+                     if_bb_only = TRUE,
+                     method = 1)
+
+deg <- vgam_deg(exprs = "mpath/only_genes_CD4tcells_tpm_geneQC.txt",
+                order = order1,
+                lm_order =  c("day_2_4", "day_2_7",  "day_4_2", "day_4_9", "day_4_5", "day_4_8"),
+                min_expr = 1,
+                p_threshold = 0.05)
+
+heatmap_nbor(exprs = "mpath/only_genes_CD4tcells_tpm_geneQC.txt",                        
+            cell_order = "day_2_4_day_2_7_day_4_2_day_4_9_day_4_5_day_4_8_order.txt",
+            plot_genes = "day_2_4_day_2_7_day_4_2_day_4_9_day_4_5_day_4_8_vgam_deg0.05.txt",
+            cell_annotation = "mpath/CD4tcells_sample_day_info2.txt", 
+            num_gene_cluster = 6,
+            hm_height = 15, hm_width = 10,
+            baseName = "mpath/CD4tcells_path1_order_vgam_deg0.05",
+            colorPalette = mycolors)
+```
+
+
+
+```{r}
+### path 2: "day_2_4", "day_2_7",  "day_4_2", "day_7_10", "day_7_11"
+ccFile <- "mpath/only_genes_CD4tcells_tpm_geneQC_landmark_cluster2.txt"
+order2 <- nbor_order(exprs = "mpath/only_genes_CD4tcells_tpm_geneQC.txt",
+                    ccFile = ccFile, 
+                    lm_order = c("day_2_4", "day_2_7",  "day_4_2", "day_7_10", "day_7_11"),
+                    if_bb_only = TRUE,
+                    method=1)
+
+deg <- vgam_deg(exprs = "mpath/only_genes_CD4tcells_tpm_geneQC.txt",
+               order = order2,
+               lm_order = c("day_2_4", "day_2_7",  "day_4_2", "day_7_10", "day_7_11"),
+               min_expr=1,
+               p_threshold=0.05)
+
+heatmap_nbor(exprs = "mpath/only_genes_CD4tcells_tpm_geneQC.txt",                        
+            cell_order = "day_2_4_day_2_7_day_4_2_day_7_10_day_7_11_order.txt",
+            plot_genes = "day_2_4_day_2_7_day_4_2_day_7_10_day_7_11_vgam_deg0.05.txt",
+            cell_annotation = "mpath/CD4tcells_sample_day_info2.txt", 
+            num_gene_cluster = 6,
+            hm_height = 15, hm_width = 10,
+            baseName = "mpath/CD4tcells_path2_order_vgam_deg0.05",
+            colorPalette = mycolors)
+```
+
+
+```{r}
+deg1 <- read.table("day_2_4_day_2_7_day_4_2_day_4_9_day_4_5_day_4_8_vgam_deg0.05.txt",sep="\t",header=T)
+deg2 <- read.table("day_2_4_day_2_7_day_4_2_day_7_10_day_7_11_vgam_deg0.05.txt",sep="\t",header=T)
+deg <- unique(c(as.character(deg1[,1]),as.character(deg2[,1])))
+
+heatmap_nbor(exprs = "mpath/only_genes_CD4tcells_tpm_geneQC.txt",                   
+            cell_order = c(order1,order2), 
+            plot_genes = deg,
+            cell_annotation = "mpath/CD4tcells_sample_day_info2.txt", 
+            num_gene_cluster = 7,
+            hm_height = 15, hm_width = 10,
+            baseName = "mpath/Path12_method1orderedbackbone_progression_heatmap", 
+            n_linechart = list(order1,order2),
+          colorPalette = mycolors)
+             
+```
+
+```{r}
+geneMap <- fread("/nfs/research2/teichmann/reference/mus-musculus/ensembl85-mouse-tx-annotation.csv")
+geneMap <- subset(geneMap, select=c("Ensembl Gene ID", "Associated Gene Name"))
+geneMap <- unique(geneMap)
+```
+
+
+```{r}
+deg1 <- merge(deg1, geneMap, by.x="X", by.y="Ensembl Gene ID", all.x=T)
+deg1 <- deg1[order(deg1$p.adj),]
+head(deg1, n=20)
+```
+
+```{r}
+deg2 <- merge(deg2, geneMap, by.x="X", by.y="Ensembl Gene ID", all.x=T)
+deg2 <- deg2[order(deg2$p.adj),]
+head(deg2, n=20)
+```
+

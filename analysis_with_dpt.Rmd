@@ -1,0 +1,101 @@
+---
+title: "Analysis with dpt"
+output: html_notebook
+---
+
+
+```{r}
+library(dpt)
+library(ggplot2)
+```
+
+```{r}
+data(threebranches)
+head(threebranches)
+```
+
+```{r}
+# diffusion transition matrix
+ts <- Transitions(threebranches, 1000)
+```
+
+```{r}
+dim(ts@transitions)
+```
+
+
+```{r}
+# Diffusion pseudotime
+pt <- dpt(ts, branching = TRUE)
+```
+
+
+```{r}
+ev <- eigen(as.matrix(ts@transitions), TRUE)$vectors
+dm <- as.data.frame(ev[, -1])
+colnames(dm) <- paste0('DC', seq_len(ncol(dm)))
+```
+
+
+
+```{r}
+qplot(DC1, DC2, data = dm, colour = pt$Branch)
+plot_dpt(ts, pt, 1:2) # DPT and average path
+```
+
+
+```{r}
+data <- read.csv("dpt/only_genes_CD4tcells_tpm.csv", check.names = F, row.names = 1)
+```
+
+```{r}
+sampleInfo <- read.delim("dpt/CD4tcells_sample_day_info.txt", check.names=F)
+mycolors <- c("#81CDC3", "#EB867F",  "#D0AB80", "#BDD68F", "#F9EF76")
+names(mycolors) <- c("day_0", "day_2", "day_3", "day_4", "day_7")
+
+colScale <- scale_colour_manual(name = "days", values = mycolors)
+```
+
+
+```{r}
+sigmas <- destiny::find.sigmas(data)
+```
+
+
+```{r}
+# sigma: Parameter for gaussian kernel, number of sigmas object
+ts <- Transitions(data, sigma = 10^4.75)
+```
+
+```{r}
+root_idx <- which(rownames(data) == "1771-026-187-E6")
+# Diffusion pseudotime
+pt <- dpt(ts, branching = TRUE, root = root_idx)
+```
+
+
+```{r}
+ev <- eigen(as.matrix(ts@transitions), TRUE)$vectors
+dm <- as.data.frame(ev[, -1]) # dm := how this steady state is approached
+colnames(dm) <- paste0('DC', seq_len(ncol(dm)))
+```
+
+
+```{r}
+qplot(DC1, DC2, data = dm, colour = pt$Branch) +
+  theme_bw()
+```
+
+```{r}
+qplot(DC1, DC2, data = dm, colour = sampleInfo$GroupID) +
+  colScale +
+  theme_bw()
+```
+
+
+```{r}
+plot_dpt(ts, pt, 1:2) # DPT and average path
+```
+
+
+
