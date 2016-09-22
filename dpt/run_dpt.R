@@ -11,6 +11,11 @@ run_dpt <- function(tpm_file, sample_file, sample_column, root_cell, out_dir) {
   # =============================================================
   
   data <- read.csv(tpm_file, row.names=1, check.names=F)
+  
+  # remove NA's
+  rm.idx <- which(colSums(apply(data, 2, is.na)) > 0)
+  if (length(rm.idx)) { data <- data[,-rm.idx] }
+  
   data <- t(data) ## transform to cells x genes
   
   ### exclude ERCC and rescale
@@ -23,6 +28,8 @@ run_dpt <- function(tpm_file, sample_file, sample_column, root_cell, out_dir) {
   # =============================================================
   
   sampleInfo <- read.csv(sample_file, check.names=F, row.names = 1)
+  
+  if (length(rm.idx)) { sampleInfo <- sampleInfo[-rm.idx,]  }
   
   ### set colors ?
   # mycolors <- c("#81CDC3", "#EB867F",  "#D0AB80", "#BDD68F", "#F9EF76")
@@ -59,12 +66,13 @@ run_dpt <- function(tpm_file, sample_file, sample_column, root_cell, out_dir) {
   # =============================================================
   
   qplot(DC1, DC2, data = dm, colour = pt$Branch) +
+    scale_colour_discrete(name = "Branch") + 
     theme_bw()
   ggsave(paste0(out_dir, "/branching_tree_branchInfo.pdf"))
   
   
   qplot(DC1, DC2, data = dm, colour = as.factor(sampleInfo[,sample_column])) +
-    scale_fill_continuous(guide = guide_legend(title = sample_column)) +
+    scale_colour_discrete(name = sample_column) + 
     theme_bw()
   ggsave(paste0(out_dir, "/branching_tree_sampleInfo.pdf"))
   
@@ -75,6 +83,13 @@ run_dpt <- function(tpm_file, sample_file, sample_column, root_cell, out_dir) {
 # run dpt
 # ======================================
 
+run_dpt("../data/malaria/all_tpm_QCfiltered.csv",
+        "../data/malaria/tcells_rebuttal.csv",
+        "day",
+        "1771-026-187-E6",
+        "malaria")
+
+
 run_dpt("../data/lung/lung_tpm.csv",
         "../data/lung/lung_sample_info.csv",
         "condition",
@@ -84,7 +99,7 @@ run_dpt("../data/lung/lung_tpm.csv",
 run_dpt("../data/frog/frog_tpm.csv",
         "../data/frog/frog_sample_info.csv",
         "hpf",
-        "SRR1795631",
+        "SRR1795679",
         "frog")
 
 run_dpt("../data/pgc/pgc_tpm.csv",

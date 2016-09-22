@@ -105,7 +105,7 @@ diff_test_res <- differentialGeneTest(cell_data[expressed_genes,],
 ```
 
 ```{r}
-sig_genes <- subset(diff_test_res, qval < 0.1)number of
+sig_genes <- subset(diff_test_res, qval < 0.1)
 head(sig_genes[order(sig_genes$qval),], n=20)
 ```
 
