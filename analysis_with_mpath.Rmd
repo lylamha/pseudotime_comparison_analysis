@@ -22,6 +22,7 @@ QC_gene(rpkmFile   = rpkmFile,
         sampleFile = sampleFile, threshold = 0.05, method = "any")
 ```
 
+### read file
 
 ```{r}
 rpkmQC <- fread(rpkmQCFile)
