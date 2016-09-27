@@ -29,7 +29,6 @@ run_monocle <- function(tpm_file, sample_file, sample_column, out_dir, gene_file
     
   }
 
-  
   ### exclude ERCC and rescale
   data    <- data[-grep("ERCC", rownames(data)),]
   rescale <- colSums(data)
@@ -141,7 +140,16 @@ run_monocle <- function(tpm_file, sample_file, sample_column, out_dir, gene_file
   # plot trajectory
   # ====================================================
   
-  plot_cell_trajectory(cell_data, color_by = "group") +
+  if (out_dir == "malaria") {
+    # define colours for malaria data set
+    mycolors <- c("#81CDC3", "#EB867F",  "#D0AB80", "#BDD68F", "#F9EF76")
+    names(mycolors) <- c("0", "2", "3", "4", "7")
+    colScale <- scale_colour_manual(name = "day", values = mycolors)
+  }
+  
+  
+  p <- plot_cell_trajectory(cell_data, color_by = "group")
+  if (out_dir == "malaria") p <- p + colScale
   ggsave(paste0(out_dir, "/cell_trajectory_sampleInfo.pdf"))
   
   
