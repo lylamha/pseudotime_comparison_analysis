@@ -70,11 +70,18 @@ run_dpt <- function(tpm_file, sample_file, sample_column, root_cell, out_dir) {
     theme_bw()
   ggsave(paste0(out_dir, "/branching_tree_branchInfo.pdf"))
   
+  if (out_dir == "malaria") {
+    # define colours for malaria data set
+    mycolors <- c("#81CDC3", "#EB867F",  "#D0AB80", "#BDD68F", "#F9EF76")
+    names(mycolors) <- c("0", "2", "3", "4", "7")
+    colScale <- scale_colour_manual(name = "day", values = mycolors)
+  }
   
-  qplot(DC1, DC2, data = dm, colour = as.factor(sampleInfo[,sample_column])) +
+  p <- qplot(DC1, DC2, data = dm, colour = as.factor(sampleInfo[,sample_column])) +
     scale_colour_discrete(name = sample_column) + 
     theme_bw()
-  ggsave(paste0(out_dir, "/branching_tree_sampleInfo.pdf"))
+  if (out_dir == "malaria") p <- p + colScale
+  ggsave(plot=p, paste0(out_dir, "/branching_tree_sampleInfo.pdf"))
   
   return(1)
 }
